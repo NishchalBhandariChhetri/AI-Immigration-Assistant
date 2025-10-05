@@ -137,6 +137,9 @@ function App() {
         </div>
       </footer>
 
+      
+
+
       {selectedArticle && (
         <NewsModal
           article={selectedArticle}
