@@ -3,6 +3,7 @@ import { MessageSquare, X, Send, Volume2, Loader2, Download, Globe } from 'lucid
 import { supabase, type Message } from '../lib/supabase';
 import { getImmigrationGuidance } from '../services/geminiService';
 import { textToSpeech, SUPPORTED_LANGUAGES, createAudioPlayer } from '../services/elevenLabsService';
+import { translateText } from '../services/translationService';
 
 export function FloatingChatbox() {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,12 +16,14 @@ export function FloatingChatbox() {
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Initialize chat session on open
   useEffect(() => {
     if (isOpen && !sessionId) {
       initializeChat();
     }
   }, [isOpen]);
 
+  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -49,6 +52,7 @@ export function FloatingChatbox() {
     setLoading(true);
 
     try {
+      // Save user message
       const { data: userMsg, error: userError } = await supabase
         .from('messages')
         .insert([{
@@ -62,14 +66,21 @@ export function FloatingChatbox() {
       if (userError) throw userError;
       setMessages(prev => [...prev, userMsg]);
 
-      const response = await getImmigrationGuidance(userMessage);
+      // Get assistant response in English
+      let assistantResponse = await getImmigrationGuidance(userMessage);
 
+      // Translate assistant response if needed
+      if (selectedLanguage !== 'en') {
+        assistantResponse = await translateText(assistantResponse, selectedLanguage);
+      }
+
+      // Save assistant message
       const { data: assistantMsg, error: assistantError } = await supabase
         .from('messages')
         .insert([{
           session_id: sessionId,
           role: 'assistant',
-          content: response
+          content: assistantResponse
         }])
         .select()
         .single();
